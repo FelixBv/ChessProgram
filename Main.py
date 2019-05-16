@@ -1,4 +1,5 @@
 from ChessProgram import ChessPiece as pieceModule
+import numpy as np
 
 white_player = True
 black_player = False
@@ -14,15 +15,18 @@ queen = "q"
 
 black_king_row = 0
 black_king_col = 4
-white_king_row = 4
-white_king_col = 7
+white_king_row = 7
+white_king_col = 4
 
-listOfPawnMoves = [[2, 0], [1, 0], [1, 1], [1, -1]]
-listOfRookMoves = [[1, 0], [-1, 0], [0, 1], [0, -1]]
-listOfCavalierMoves = [[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]]
-listOfBishopMoves = [[1, 1], [1, -1], [-1, 1], [-1, -1]]
-listOfQueenMoves = [[1, 1], [1, -1], [-1, 1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1]]
-listOfKingMoves = [[1, 1], [1, -1], [-1, 1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1]]
+# piece_to_remove = 0
+piece_to_remove = pieceModule.ChessPiece(0, "dummy")
+
+# listOfPawnMoves = np.array([[2, 0], [1, 0], [1, 1], [1, -1]])
+# listOfRookMoves = np.array([[1, 0], [-1, 0], [0, 1], [0, -1]])
+# listOfCavalierMoves = np.array([[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]])
+# listOfBishopMoves = np.array([[1, 1], [1, -1], [-1, 1], [-1, -1]])
+# listOfQueenMoves = np.array([[1, 1], [1, -1], [-1, 1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1]])
+# listOfKingMoves = np.array([[1, 1], [1, -1], [-1, 1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1]])
 
 chessboard = [
     [" ", " ", " ", " ", " ", " ", " ", " "],
@@ -40,11 +44,16 @@ def main():
     create_pieces()
     player = black_player
     is_move_valid = True
+    global white_king_row
+    global white_king_col
+    global black_king_row
+    global black_king_col
+    global piece_to_remove
 
     while 1:
         print_board()
         if is_move_valid:
-            if not player:  # player != player    #So White is player == true
+            if not player:
                 player = white_player
                 print("White turn")
             else:
@@ -59,7 +68,7 @@ def main():
             is_move_valid = False
             continue
         new_position = (input('Enter your move: ')).upper()
-        if new_position[0] not in listOfColumns or new_position[1] not in listOfRows:
+        if new_position[0] not in listOfColumns or new_position[1] not in listOfRows or new_position == current_position:
             print("Invalid Position")
             is_move_valid = False
             continue
@@ -74,6 +83,7 @@ def main():
                 piece.new_col = listOfColumns.index(new_position[0])
                 if player != piece.color:
                     is_move_valid = False
+                    continue
                 elif is_move_available(piece):
                     chessboard[piece.curr_row][piece.curr_col] = " "
                     piece.last_row = piece.curr_row
@@ -81,6 +91,28 @@ def main():
                     piece.curr_row = piece.new_row
                     piece.curr_col = piece.new_col
                     chessboard[piece.curr_row][piece.curr_col] = piece.type
+                    if put_own_king_in_check(player):
+                        if piece_to_remove.type != "dummy":     # if there was a piece removed, put it back
+                            listOfPieces.append(piece_to_remove)
+                            chessboard[piece_to_remove.curr_row][piece_to_remove.curr_col] = str(piece_to_remove.type)
+                            piece_to_remove = pieceModule.ChessPiece(0, "dummy")
+                            print("here D:")
+                        else:
+                            chessboard[piece.curr_row][piece.curr_col] = " "
+                        piece.curr_row = piece.last_row
+                        piece.curr_col = piece.last_col
+                        chessboard[piece.curr_row][piece.curr_col] = str(piece.type)
+                        is_move_valid = False
+                        print("You would be in check")
+                        continue
+
+                    if piece.type == king and player == white_player:
+                        white_king_row = piece.curr_row
+                        white_king_col = piece.curr_col
+                    elif piece.type == king and player == black_player:
+                        black_king_row = piece.curr_row
+                        black_king_col = piece.curr_col
+
                 else:
                     is_move_valid = False
                 break
@@ -114,7 +146,7 @@ def create_pieces():
             piece.curr_col = j
             piece.last_row = i
             piece.last_col = j
-            chessboard[piece.curr_row][piece.curr_col] = piece.type
+            chessboard[piece.curr_row][piece.curr_col] = str(piece.type)
 
 
 # chessboard[row][col] or [y][x]
@@ -134,69 +166,94 @@ def print_board():
 
 
 def is_move_available(piece):
-    if piece.color:
-        position = [piece.curr_row - piece.new_row, piece.curr_col - piece.new_col]
-    else:
-        position = [piece.new_row - piece.curr_row, piece.curr_col - piece.new_col]
+    global piece_to_remove
 
+    mvmt = np.array([piece.curr_row - piece.new_row, piece.curr_col - piece.new_col])
+    # check if the move is possible for the type of piece
+    if piece.type == rook or piece.type == bishop or piece.type == queen:
+        if mvmt[0] != 0 and mvmt[1] != 0 and abs(mvmt[0]) != abs(mvmt[1]):
+            return False
+    if piece.type == pawn:
+        if abs(mvmt[0]) == 2 and abs(mvmt[1]) != 0:
+            return False
+        elif abs(mvmt[1]) > 1 or abs(mvmt[0]) > 2:
+            return False
+        elif abs(mvmt[1]) == 1 and (abs(mvmt[0]) == 0 or abs(mvmt[0]) > 1):
+            return False
+        elif (piece.color == white_player and mvmt[0] < 0) or (piece.color == black_player and mvmt[0] > 0):
+            return False
+        elif abs(mvmt[0]) == 2 and piece.color == 1 and piece.curr_row != 6:
+            return False
+        elif abs(mvmt[0]) == 2 and piece.color == 0 and piece.curr_row != 1:
+            return False
+        elif mvmt[1] == 0 and chessboard[piece.new_row][piece.new_col] != " ":
+            return False
+    elif piece.type == rook and not (mvmt[0] != 0 or mvmt[1] != 0):
+        return False
+    elif piece.type == cavalier and not((abs(mvmt[0]) == 2 and abs(mvmt[1]) == 1) or (abs(mvmt[0]) == 1 and abs(mvmt[1]) == 2)):
+        return False
+    elif piece.type == bishop and not abs(mvmt[0]) == abs(mvmt[1]):
+        return False
+    elif piece.type == queen and not(abs(mvmt[0]) == abs(mvmt[1]) or mvmt[0] == 0 or mvmt[1] == 0):
+        return False
+    elif piece.type == king and not (abs(mvmt[0]) <= 1 and abs(mvmt[0]) <= 1):
+        return False
+
+    # Check if there is no piece in the way
     if piece.type != cavalier:
-        increment_y = 0
-        increment_x = 0
-        if position[0] < 0:
-            increment_y = -1
-        elif position[0] > 0:
-            increment_y = 1
-        if position[1] < 0:
-            increment_x = -1
-        elif position[1] > 0:
-            increment_x = 1
-        if abs(position[0]) > abs(position[1]):
-            for i in range(piece.curr_row, piece.new_row, increment_y):
-                if chessboard[piece.curr_row + increment_y][piece.curr_col + increment_x] != " ":
+        row_increment = 0
+        col_increment = 0
+        if mvmt[0] > 0:
+            row_increment = -1
+        elif mvmt[0] < 0:
+            row_increment = 1
+        if mvmt[1] > 0:
+            col_increment = -1
+        elif mvmt[1] < 0:
+            col_increment = 1
+        if abs(mvmt[0]) > abs(mvmt[1]):
+            for i in range(1, abs(mvmt[0])):
+                if chessboard[piece.curr_row + i*row_increment][piece.curr_col + i*col_increment] != " ":
                     print("A piece is blocking the way")
                     return False
         else:
-            for i in range(piece.curr_col, piece.new_col, increment_x):
-                if chessboard[piece.curr_row + increment_y][piece.curr_col + increment_x] != " ":
+            for i in range(1, abs(mvmt[1])):
+                if chessboard[piece.curr_row + i * row_increment][piece.curr_col + i * col_increment] != " ":
                     print("A piece is blocking the way")
                     return False
-    if piece.type == rook or piece.type == bishop or piece.type == queen:
-        if position[0] != 0:
-            position[0] = position[0] / position[0]  # ghetto normalisation
-        if position[1] != 0:
-            position[1] = position[1] / position[1]
-
-    if piece.type == pawn:
-        if position not in listOfPawnMoves:
-            return False
-        elif position[0] == 2 and piece.color == 1 and piece.curr_row != 6:
-            return False
-        elif position[0] == 2 and piece.color == 0 and piece.curr_row != 1:
-            return False
-        elif position[1] == 0 and chessboard[piece.new_row][piece.new_col] != " ":
-            return False
-        elif position[1] != 0 and chessboard[piece.new_row][piece.new_col] == " ":
-            return False
-    elif piece.type == rook and position not in listOfRookMoves:
-        return False
-    elif piece.type == cavalier and position not in listOfCavalierMoves:
-        return False
-    elif piece.type == bishop and position not in listOfBishopMoves:
-        return False
-    elif piece.type == queen and position not in listOfQueenMoves:
-        return False
-    elif piece.type == king and position not in listOfKingMoves:
-        return False
-
-    if chessboard[piece.new_row][piece.new_col] != " ":
+    # if it removes the opponent's piece
+    if chessboard[piece.new_row][piece.new_col] != " " and chessboard[piece.new_row][piece.new_col] != king:
         for elem in listOfPieces:
             if elem.curr_row == piece.new_row and elem.curr_col == piece.new_col:
-                piece_to_delete = elem
-                if piece.color == piece_to_delete.color:
+                if piece.color == elem.color:
                     return False
-                listOfPieces.remove(piece_to_delete)
-                break
+                piece_to_remove = pieceModule.ChessPiece(elem.color, elem.type)
+                piece_to_remove.curr_col = elem.curr_col
+                piece_to_remove.curr_row = elem.curr_row
+                listOfPieces.remove(elem)
+                return True
     return True
+
+
+def put_own_king_in_check(player):
+    global white_king_row
+    global white_king_col
+    global black_king_row
+    global black_king_col
+
+    for elem in listOfPieces:
+        if elem.color != player:
+            if player == white_player:
+                elem.new_row = white_king_row
+                elem.new_col = white_king_col
+            else:
+                elem.new_row = black_king_row
+                elem.new_col = black_king_col
+            if is_move_available(elem):
+                print("danger:", elem.type, " color: ", elem.color, " row: ", listOfRows[elem.curr_row],
+                      " col: ", listOfColumns[elem.curr_col])
+                return True
+    return False
 
 
 if __name__ == "__main__":
